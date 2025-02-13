@@ -1,0 +1,8 @@
+pandas
+numpy
+nltk
+ipywidgets
+textblob
+scikit-learn
+pickle5
+streamlit
