@@ -4,6 +4,6 @@ nltk
 ipywidgets
 textblob
 scikit-learn
-lightbgm
+lightgbm
 
 streamlit
