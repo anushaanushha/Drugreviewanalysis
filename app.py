@@ -22,6 +22,26 @@ vectorizer = pickle.load(open("litfidf_vectorizer_lgb.pkl", "rb"))
 # List of unique drug names from the dataset
 drug_names = sorted(df["drugName"].dropna().unique().tolist())
 
+# Updated list of conditions
+unique_conditions = [
+    "Acne", "Actinic Keratosis", "Acute Coronary Syndrome", "Acute Lymphoblastic Leukemia", "Acute Promyelocytic Leukemia",
+    "Addison's Disease", "Adrenocortical Insufficiency", "Adult Human Growth Hormone Deficiency", "Agitation", "Alcohol Dependence",
+    "Allergic Rhinitis", "Alopecia", "Alzheimer's Disease", "Amenorrhea", "Amyotrophic Lateral Sclerosis", "Anxiety",
+    "Anxiety and Stress", "Arrhythmia", "Asthma", "Atrial Fibrillation", "Bacterial Infection", "Bacterial Skin Infection",
+    "Benign Prostatic Hyperplasia", "Bipolar Disorder", "Bladder Infection", "Breast Cancer", "Bronchitis", "Cancer",
+    "Chronic Fatigue Syndrome", "Chronic Myeloid Leukemia", "Chronic Pain", "COPD (Chronic Obstructive Pulmonary Disease)",
+    "Constipation", "Crohn's Disease", "Cystic Fibrosis", "Depression", "Diabetes Type 1", "Diabetes Type 2", "Diabetic Neuropathy",
+    "Diarrhea", "Diverticulitis", "Dry Eye Disease", "Dysmenorrhea", "Eczema", "Endometriosis", "Epilepsy", "Erectile Dysfunction",
+    "Fibromyalgia", "GERD (Gastroesophageal Reflux Disease)", "Glaucoma", "Gout", "Headache", "Heart Failure", "Hepatitis B",
+    "Hepatitis C", "High Blood Pressure (Hypertension)", "High Cholesterol", "HIV Infection", "Hyperthyroidism", "Hypothyroidism",
+    "Insomnia", "Irritable Bowel Syndrome", "Kidney Infections", "Leukemia", "Liver Disease", "Lyme Disease", "Lupus",
+    "Macular Degeneration", "Malaria", "Menopause", "Migraine", "Multiple Sclerosis", "Nausea/Vomiting", "Obesity", "Osteoarthritis",
+    "Osteoporosis", "Panic Disorder", "Parkinson's Disease", "Peptic Ulcer Disease", "Pneumonia", "Postmenopausal Symptoms",
+    "Post-Traumatic Stress Disorder (PTSD)", "Prostate Cancer", "Psoriasis", "Psoriatic Arthritis", "Rheumatoid Arthritis", "Rosacea",
+    "Schizophrenia", "Sciatica", "Seizures", "Sexual Dysfunction", "Shingles", "Sinusitis", "Skin Cancer", "Sleep Apnea",
+    "Smoking Cessation", "Stomach Ulcer", "Stroke", "Urinary Tract Infection (UTI)", "Vitamin D Deficiency"
+]
+
 # Function to clean text
 def clean_text(text):
     text = text.lower()
@@ -29,13 +49,26 @@ def clean_text(text):
     text = " ".join([word for word in text.split() if word not in stop_words])  # Remove stopwords
     return text
 
-# Function to classify sentiment using trained model
+# Function to classify sentiment using trained model and highlight key element
 def classify_review(review):
     cleaned_review = clean_text(review)
     X_input = vectorizer.transform([cleaned_review])
     prediction = model.predict(X_input)
+
+    # Extract feature names from the vectorizer
+    feature_names = np.array(vectorizer.get_feature_names_out())
+
+    # Get the word importance (TF-IDF scores)
+    tfidf_scores = X_input.toarray()[0]
+
+    # Find the most important word(s) based on highest TF-IDF score
+    top_word_index = np.argsort(tfidf_scores)[-1]  # Get index of max score
+    top_word = feature_names[top_word_index]
+
     sentiments = ["negative", "neutral", "positive"]
-    return sentiments[int(prediction[0])] if prediction.ndim == 1 else sentiments[np.argmax(prediction, axis=1)[0]]
+    sentiment_result = sentiments[int(prediction[0])] if prediction.ndim == 1 else sentiments[np.argmax(prediction, axis=1)[0]]
+    
+    return sentiment_result, top_word
 
 # Function to analyze sentiment using TextBlob
 def analyze_sentiment(review):
@@ -47,17 +80,26 @@ def search_reviews(drug_name):
     drug_reviews = df[df['drugName'].str.contains(drug_name, case=False, na=False)]
     return f"Overall Sentiment for {drug_name}: {analyze_sentiment(' '.join(drug_reviews['review'].tolist()))}" if not drug_reviews.empty else f"No reviews found for {drug_name}."
 
-# Function to get top drugs
-def get_top_drugs(n):
-    top_drugs = df["drugName"].value_counts().nlargest(n)
-    return top_drugs.reset_index().rename(columns={"index": "Drug Name", "drugName": "Review Count"}) if not top_drugs.empty else "No drugs found."
+# Function to get top drugs based on condition and rating
+def get_top_drugs_by_condition(condition):
+    filtered_df = df[df["condition"].str.contains(condition, case=False, na=False)]
+    if filtered_df.empty:
+        return "No drugs found for this condition."
+    
+    top_drugs = (
+        filtered_df.groupby("drugName")["rating"]
+        .mean()
+        .reset_index()
+        .sort_values(by="rating", ascending=False)
+    )
+    return top_drugs.rename(columns={"drugName": "Drug Name", "rating": "Average Rating"})
 
 # Function to get drug information
 def get_drug_info(drug_name):
     drug_data = df[df["drugName"].str.lower() == drug_name.lower()]
     if drug_data.empty:
         return f"Information for {drug_name} not found."
-    return f"**Rating:** {round(drug_data['rating'].mean(), 2)}\n\n**Conditions:** {', '.join(drug_data['condition'].dropna().unique())}\n\n**Summary:** {' '.join(drug_data['review'].head(5).tolist())[:300]}"
+    return f"**Rating:** {round(drug_data['rating'].mean(), 2)}"
 
 # Streamlit UI
 st.title("💊 Drug Review Analysis")
@@ -72,24 +114,23 @@ if task == "Enter Review & Analyze":
     review_input = st.text_area("Enter a drug review:")
     if st.button("Analyze"):
         if review_input.strip():
-            st.markdown(f"**Sentiment:** {classify_review(review_input)}")
+            sentiment, key_word = classify_review(review_input)
+            st.markdown(f"**Sentiment:** {sentiment}")
+            st.markdown(f"**Key Element:** `{key_word}` (influenced classification)")
         else:
             st.warning("⚠️ Please enter a review.")
 
-elif task in ["Estimate Drug Rating", "Search Drug Reviews", "Know About Drug"]:
-    drug_name = st.selectbox("Select a Drug Name:", drug_names)
-    
-    if task == "Estimate Drug Rating" and st.button("Estimate Rating"):
-        avg_rating = df[df["drugName"].str.lower() == drug_name.lower()]["rating"].mean()
-        st.success(f"**Estimated Drug Rating:** {round(avg_rating, 2)}" if not np.isnan(avg_rating) else "Rating not found.")
-
-    elif task == "Search Drug Reviews" and st.button("Search Reviews"):
-        st.markdown(search_reviews(drug_name))
-
-    elif task == "Know About Drug" and st.button("Get Info"):
-        st.markdown(get_drug_info(drug_name))
-
 elif task == "Top Drugs":
-    top_n = st.number_input("Enter the number of top drugs:", min_value=1, max_value=50, value=10, step=1)
+    selected_condition = st.selectbox("Select Condition:", unique_conditions)
     if st.button("Show Top Drugs"):
-        st.table(get_top_drugs(top_n))
+        st.table(get_top_drugs_by_condition(selected_condition))
+
+elif task in ["Estimate Drug Rating", "Search Drug Reviews", "Know About Drug"]:
+    selected_drug = st.selectbox("Select Drug:", drug_names)
+    if st.button("Analyze"):
+        if task == "Estimate Drug Rating":
+            st.markdown(get_drug_info(selected_drug))
+        elif task == "Search Drug Reviews":
+            st.markdown(search_reviews(selected_drug))
+        elif task == "Know About Drug":
+            st.markdown(get_drug_info(selected_drug))
