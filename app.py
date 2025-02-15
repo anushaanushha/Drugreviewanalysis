@@ -100,6 +100,11 @@ def get_drug_info(drug_name):
     if drug_data.empty:
         return f"Information for {drug_name} not found."
     return f"**Rating:** {round(drug_data['rating'].mean(), 2)}"
+def get_drug_information(drug_name):
+    drug_data = df[df["drugName"].str.lower() == drug_name.lower()]
+    if drug_data.empty:
+        return f"Information for {drug_name} not found."
+    return f"*Rating:* {round(drug_data['rating'].mean(), 2)}\n\n*Conditions:* {', '.join(drug_data['condition'].dropna().unique())}\n\n*Summary:* {' '.join(drug_data['review'].head(5).tolist())[:300]}"
 
 # Streamlit UI
 st.title("💊 Drug Review Analysis")
@@ -116,7 +121,7 @@ if task == "Enter Review & Analyze":
         if review_input.strip():
             sentiment, key_word = classify_review(review_input)
             st.markdown(f"**Sentiment:** {sentiment}")
-            st.markdown(f"**Key Element:** `{key_word}` (influenced classification)")
+            st.markdown(f"**Key Element:** `{key_word}` ")
         else:
             st.warning("⚠️ Please enter a review.")
 
@@ -133,4 +138,4 @@ elif task in ["Estimate Drug Rating", "Search Drug Reviews", "Know About Drug"]:
         elif task == "Search Drug Reviews":
             st.markdown(search_reviews(selected_drug))
         elif task == "Know About Drug":
-            st.markdown(get_drug_info(selected_drug))
+            st.markdown(get_drug_information(selected_drug))
