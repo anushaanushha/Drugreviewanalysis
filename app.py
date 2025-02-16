@@ -6,6 +6,8 @@ import nltk
 from nltk.corpus import stopwords
 from textblob import TextBlob
 import pickle
+from chat import chat_with_gemini
+
 
 # Download stopwords if not available
 nltk.download("stopwords")
@@ -139,3 +141,39 @@ elif task in ["Estimate Drug Rating", "Search Drug Reviews", "Know About Drug"]:
             st.markdown(search_reviews(selected_drug))
         elif task == "Know About Drug":
             st.markdown(get_drug_information(selected_drug))
+
+
+# Update for image display (Replace `use_column_width` with `use_container_width`)
+st.sidebar.image("image.jpg", use_container_width=True)
+
+# Initialize session state for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []  # Stores chat history
+
+# Chat history section
+with st.sidebar.expander("📜 Chat History", expanded=True):
+    for message in st.session_state.messages:
+        role = "🧑 You" if message["role"] == "You" else "🤖 Chatbot"
+        st.markdown(f"**{role}:** {message['text']}")
+
+# Input field for user message (Avoid modifying session_state directly after defining it)
+user_input = st.sidebar.text_input("Type your message here...", key="user_input")
+
+if st.sidebar.button("Send"):
+    if user_input.strip():
+        # Append user input to chat history
+        st.session_state.messages.append({"role": "You", "text": user_input})
+
+        try:
+            # Get response from chatbot
+            response = chat_with_gemini(user_input)
+        except Exception as e:
+            response = "⚠️ Chatbot service is currently unavailable. Please try again later."
+
+        # Append chatbot response to chat history
+        st.session_state.messages.append({"role": "Chatbot", "text": response})
+
+        # Reset input field (Instead of modifying session_state, we use st.experimental_rerun)
+        st.rerun()
+    else:
+        st.sidebar.warning("⚠️ Please enter a message.")
