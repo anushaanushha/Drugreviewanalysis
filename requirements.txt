@@ -5,5 +5,5 @@ ipywidgets
 textblob
 scikit-learn
 lightgbm
-
+google-generativeai
 streamlit
