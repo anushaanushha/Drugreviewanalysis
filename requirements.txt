@@ -5,6 +5,10 @@ ipywidgets
 textblob
 scikit-learn
 lightgbm
-google-generativeai
-streamlit
+streamlit==1.32.0
 altair==4.2.2
+
+# Fix Gemini dependencies
+google-generativeai==0.3.2
+google-api-core==2.17.1
+setuptools
